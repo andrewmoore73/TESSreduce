@@ -36,23 +36,37 @@ from .psf_photom import create_psf
 import requests
 import json
 
+
 def strip_units(data):
+	"""
+ 	Converts non-numpy-array data objects into numpy arrays and passes on numpy arrays
+	------
+  	Inputs
+	------
+	data : array_like
+ 		Data object to be converted into a numpy ndarray
+	------
+   	Returns
+    	------
+     	data : array
+      		Input parameter updated to be of type numpy ndarray 
+	""""
 	if type(data) != np.ndarray:
 		data = data.value
 	return data
 
+
 def sigma_mask(data,sigma=3):
 	"""
-	Just does a sigma clip on an array.
-
-	Parameters
-	----------
-	data : array
+	Applies a sigma clip on an array.
+ 	------
+	Inputs
+	------
+	data : array_like
 		A single image 
-
 	sigma : float
-		sigma used in the sigma clipping
-
+		Sigma used in the sigma clipping
+	------
 	Returns
 	-------
 	clipped : array
@@ -61,24 +75,24 @@ def sigma_mask(data,sigma=3):
 	clipped = ~sigma_clip(data,sigma=sigma).mask
 	return clipped 
 
+
 def Source_mask(Data, grid=0):
 	"""
 	Makes a mask of sources in the image using conditioning on percentiles.
-	The grid option breakes the image up into sections the size of grid to
+	The grid option breaks the image up into sections the size of grid to
 	do a basic median subtraction of the background. This is useful for 
 	large fovs where the background has a lot of structure.
-
-	Parameters
-	----------
-	data : array
+	------
+	Inputs
+	------
+	data : array_like
 		A single image 
-	
 	grid : int
-		size of the averaging square used to do a median background subtraction 
+		Size of the averaging square used to do a median background subtraction 
 		before finding the sources.
-
+  	------
 	Returns
-	-------
+	------
 	mask : array
 		Boolean mask array for the sources in the image
 	"""
@@ -107,7 +121,24 @@ def Source_mask(Data, grid=0):
 
 	return mask
 
+
 def unknown_mask(image):
+	"""
+ 	Makes a mask of unknown objects in the image using conditioning on percentiles.
+	The grid option breaks the image up into sections the size of grid to
+	do a basic median subtraction of the background. This is useful for 
+	large fovs where the background has a lot of structure.
+	------
+  	Inputs
+   	------
+	image : array_like
+ 		a single image
+   	------
+    	Returns
+     	------
+      	Mask : array
+      		Boolean mask for the unknown objects in the image
+ 	"""
 	mask = np.zeros_like(image)
 	for i in range(image.shape[1]):
 		d = image.copy()
@@ -137,30 +168,40 @@ def unknown_mask(image):
 
 
 def parallel_bkg3(data,mask):
+	""" 
+ 	------
+    	Inputs
+	------
+ 	data: array_like
+		a single image
+   	mask: array_like
+		mask of pixels to be inpainted with biharmonic equations
+  	------
+	Returns
+     	------
+      	estimate: array
+       		background estimate in the image.
+       	"""
 	data[mask] = np.nan
 	estimate = inpaint.inpaint_biharmonic(data,mask)
 	return estimate
 
+
 def Smooth_bkg(data, gauss_smooth=2, interpolate=False, extrapolate=True):
 	"""
 	Interpolate over the masked objects to derive a background estimate. 
-
-	Parameters
-	----------
-	data : array
-		A single image 
-	
+ 	------
+	Inputs
+	------
+	data : array_like
+		a single image 
 	extrapolate: Bool
 		switch for using extrapolation in the background 
-
+	------
 	Returns
 	-------
-	estimate : array 
+	estimate : array
 		an estimate of the smooth background in the TESS image
-
-	bitmask : array
-		an array indicating where extrapolation was used
-
 	"""
 	#data[data == 0] = np.nan
 	if (~np.isnan(data)).any():
@@ -199,29 +240,26 @@ def Smooth_bkg(data, gauss_smooth=2, interpolate=False, extrapolate=True):
 
 	return estimate
 
+
 def Calculate_shifts(data,mx,my,finder):
 	"""
 	Calculate the offsets of sources identified by photutils from a reference
-
-	Parameters
-	----------
-	data : array
+	------
+	Inputs
+	------
+	data : array_like
 		a single frame from the tpf
-
-	mx : array
+	mx : array_like
 		mean row positions for the centroids from the reference image
-
-	my : array
+	my : array_like
 		mean col positions for the centroids from the reference image
-
-	daofind : DAOStarFinder
+	finder : DAOStarFinder
 		module to find the centroid positions
-
+ 	------
 	Returns
-	-------
+	------
 	shifts : array
 		row and col shift to match the data centroids to the reference image
-
 	"""
 	shifts = np.zeros((2,len(mx))) * np.nan
 	if np.nansum(data) > 0:
@@ -248,7 +286,24 @@ def Calculate_shifts(data,mx,my,finder):
 			shifts[1,indo] = np.nan
 	return shifts
 
+
 def image_sub(theta, image, ref):
+	"""
+ 	Description
+	------
+  	Inputs
+   	--------
+	theta : array_like
+		the image shift vector
+  	image : array_like
+		a single image
+   	ref : float
+    		additive reference to combine with flux before taking cutout
+	------
+    	Returns
+     	------
+
+      	"""
 	dx, dy = theta
 	s = shift(image,([dx,dy]),order=5)
 	#translation = np.float64([[1,0,dx],[0,1, dy]])
@@ -256,29 +311,22 @@ def image_sub(theta, image, ref):
 	diff = (ref-s)**2
 	return np.nansum(diff[5:-5,5:-5])
 
+
 def difference_shifts(image,ref):
 	"""
-	Calculate the offsets of sources identified by photutils from a reference
-
-	Parameters
-	----------
-	data : array
-		a single frame from the tpf
-
-	mx : array
-		mean row positions for the centroids from the reference image
-
-	my : array
-		mean col positions for the centroids from the reference image
-
-	daofind : DAOStarFinder
-		module to find the centroid positions
-
-	Returns
-	-------
-	shifts : array
-		row and col shift to match the data centroids to the reference image
-
+	Description
+ 	------
+  	Inputs
+   	------
+    	image : array_like
+     		flux object
+       	ref : float
+		additive reference to combine with flux before taking cutout
+	------
+ 	returns
+  	------
+   	s : array
+    		
 	"""
 	if np.nansum(abs(image)) > 0:
 		x0= [0,0]
@@ -291,24 +339,22 @@ def difference_shifts(image,ref):
 		s = np.zeros((2)) * np.nan
 	return s
 
+
 def Smooth_motion(Centroids,tpf):
 	"""
 	Calculate the smoothed centroid shift 
-
-	Parameters
-	----------
-	Centroids : array
+	------
+	Inputs
+	------
+	Centroids : array_like
 		centroid shifts from all frames
-
-
 	TPF : lightkurve targetpixelfile
 		tpf
-
+ 	------
 	Returns
-	-------
+	------
 	smoothed : array
 		smoothed displacement of the centroids
-
 	"""
 	smoothed = np.zeros_like(Centroids) * np.nan
 	try:
@@ -346,21 +392,20 @@ def Smooth_motion(Centroids,tpf):
 def smooth_zp(zp,time):
 	"""
 	Calculate the smoothed centroid shift 
-
-	Parameters
-	----------
-	zp : array
+	------
+	Inputs
+	------
+	zp : array_like
 		centroid shifts from all frames
-
-
 	time : lightkurve targetpixelfile
 		tpf
-
+	------
 	Returns
-	-------
+	------
 	smoothed : array
 		smoothed displacement of the centroids
-
+  	err : float
+   		associated standard deviation
 	"""
 	smoothed = np.zeros_like(zp) * np.nan
 	plt.figure()
@@ -384,21 +429,47 @@ def smooth_zp(zp,time):
 	return smoothed, err
 
 
-
 def grads_rad(flux):
+	"""  
+ 	Calculate the radius of a point in the flux gradient vs flux gradient gradient plane
+  	------
+   	Inputs
+    	------
+	flux : array_like
+ 		images
+     	------
+      	Returns
+       	------
+	rad : array
+ 		the distance from the origin of the flux gradient vs flux gradient's gradient
+   		plane for each point in the images
+ 	"""
 	rad = np.sqrt(np.gradient(flux)**2+np.gradient(np.gradient(flux))**2)
 	return rad
 
+
 def grad_flux_rad(flux):
+	"""  
+ 	Calculate the radius of a point in the flux vs flux gradient plane
+  	------
+   	Inputs
+    	------
+	flux : array_like
+ 		images
+     	------
+      	Returns
+       	------
+	rad : array
+ 		the distance from the origin of the flux vs flux gradient plane for each point in the images
+   	"""
 	rad = np.sqrt(flux**2+np.gradient(flux)**2)
 	return rad
 
 
-def sn_lookup(name,time='disc',buffer=0,print_table=True, df = False):
+def sn_lookup(name,time='disc',buffer=0,print_table=True,df=False):
 	"""
 	Check for overlapping TESS ovservations for a transient. Uses the Open SNe Catalog for 
 	discovery/max times and coordinates.
-
 	------
 	Inputs
 	------
@@ -408,13 +479,13 @@ def sn_lookup(name,time='disc',buffer=0,print_table=True, df = False):
 		reference time to use, can be either disc, or max
 	buffer : float
 		overlap buffer time in days 
-	
 	-------
 	Options
 	-------
 	print_table : bool 
 		if true then the lookup table is printed
-
+	df: bool
+		if true then tr_list is returned as a pandas dataframe rather than as a list
 	-------
 	Returns
 	-------
@@ -509,11 +580,11 @@ def sn_lookup(name,time='disc',buffer=0,print_table=True, df = False):
 		print('No TESS coverage')
 		return None
 
-def spacetime_lookup(ra,dec,time=None,buffer=0,print_table=True, df = False, print_all=False):
+
+def spacetime_lookup(ra,dec,time=None,buffer=0,print_table=True,df=False):
 	"""
 	Check for overlapping TESS ovservations for a transient. Uses the Open SNe Catalog for 
 	discovery/max times and coordinates.
-
 	------
 	Inputs
 	------
@@ -525,13 +596,13 @@ def spacetime_lookup(ra,dec,time=None,buffer=0,print_table=True, df = False, pri
 		reference time to use, must be in MJD
 	buffer : float
 		overlap buffer time in days 
-	
 	-------
 	Options
 	-------
-	print_table : bool 
+	print_table : bool
 		if true then the lookup table is printed
-
+   	df : bool
+		if true then tr_list is returned as a pandas dataframe rather than as a list
 	-------
 	Returns
 	-------
@@ -592,7 +663,26 @@ def spacetime_lookup(ra,dec,time=None,buffer=0,print_table=True, df = False, pri
 
 
 def par_psf_source_mask(data,prf,sigma=5):
-
+	"""
+ 	Used for building a psf source mask from a given prf
+  	------
+   	Inputs
+    	------
+	data : array_like
+ 		a single image
+ 	prf : array_like
+		the prf used as a 2D array of the psf kernel 
+  	------
+   	Options
+    	------
+  	sigma : int 
+		the number of standard deviations above the median above which to select sources for building the mask
+     	------
+      	Returns
+       	------
+	m : array
+ 		source mask
+ 	"""
 	mean, med, std = sigma_clipped_stats(data, sigma=3.0)
 
 	finder = StarFinder(med + sigma*std,kernel=prf,exclude_border=False)
@@ -610,7 +700,39 @@ def par_psf_source_mask(data,prf,sigma=5):
 
 def par_psf_initialise(flux,camera,ccd,sector,column,row,cutoutSize,loc,time_ind=None,ref=False):
 	"""
-	For gathering the cutouts and PRF base.
+	For gathering the cutouts and PRF base
+ 	------
+  	Inputs
+   	------
+    	flux : array_like
+		images
+     	camera : int
+      		camera number
+      	ccd : int
+       		ccd number
+       	column : int
+		image column number
+	row : int
+ 		image row number
+ 	cutoutSize : int
+  		prf cutout size
+  	loc : array_like
+		1x2 (column,row) array_like object for specifying prf location on a cutout image 
+	------
+ 	Options
+  	------
+   	time_ind : array_like or None 
+		time indices for flux images. If None then time_ind is set to the indices of flux
+    	ref : array_like or bool 
+     		additive reference to combine with flux before taking cutout. 
+       		If False then no change is made to flux before taking cutout
+    	------
+     	Returns
+      	------
+       	prf : array
+		resutant prf 
+	cutout : array
+ 		resultant cutout
 	"""
 	if time_ind is None:
 		time_ind = np.arange(0,len(flux))
@@ -629,14 +751,60 @@ def par_psf_initialise(flux,camera,ccd,sector,column,row,cutoutSize,loc,time_ind
 		cutout = flux[time_ind,loc[1]-cutoutSize//2:loc[1]+1+cutoutSize//2,loc[0]-cutoutSize//2:loc[0]+1+cutoutSize//2] # gather cutouts
 	prf = create_psf(prf,cutoutSize)
 	return prf, cutout
+	
 
 def par_psf_flux(image,prf,shift=[0,0]):
+	"""
+ 	Applies an image shift and returns the updated flux array
+  	------
+   	Inputs
+    	------
+     	image : array_like
+      		flux object
+	prf : TESS_PRF object
+   	------
+    	Options
+     	------
+   	shift : list
+    		shift vector
+      	------
+	Returns
+ 	------
+  	prf.flux : array
+   		post-shift flux array
+  	"""
 	if np.isnan(shift)[0]:
 		shift = np.array([0,0])
 	prf.psf_flux(image,ext_shift=shift)
 	return prf.flux
 
+
 def par_psf_full(cutout,prf,shift=[0,0],xlim=2,ylim=2):
+	"""
+ 	Applies an image shift to an image cutout
+  	------
+   	Inputs
+    	------
+     	cutout : array_like
+      		cutout array
+      	prf : TESS_PRF object
+       	------
+	Options
+ 	------
+  	shift : list
+   		shift vector
+   	xlim : float
+    		cutout x-axis limit
+    	ylim : float
+     		cutout y-axis limit
+       	------
+	Returns
+ 	------
+  	prf.flux : array
+   		cutout flux array
+   	pos : list
+    		(x,y) position coordinates
+     	"""
 	if np.isnan(shift)[0]:
 		shift = np.array([0,0])
 	prf.psf_position(cutout,ext_shift=shift,limx=xlim,limy=ylim)
@@ -646,7 +814,27 @@ def par_psf_full(cutout,prf,shift=[0,0],xlim=2,ylim=2):
 
 
 def external_save_TESS(ra,dec,sector,size=90,quality_bitmask='default',cache_dir=None):
-
+	"""
+ 	------
+  	Inputs
+   	------
+    	ra : 
+     		right ascension value
+     	dec : 
+      		declination value
+      	sector : int
+       		TESS sector number
+       	------
+	Options
+ 	------
+  	size : int
+   		cutout size
+   	quality_bitmask : str or int
+    		bitmask (integer) which identifies the quality flag bitmask that should be used to mask out bad cadences
+      		(see lightkurve.search_tesscut documentation)
+    	cache_dir : str or None
+     		download directory
+     	"""
 	c = SkyCoord(ra=float(ra)*u.degree, dec=float(dec) * u.degree, frame='icrs')
 	tess = lk.search_tesscut(c,sector=sector)
 	tpf = tess.download(quality_bitmask=quality_bitmask,cutout_size=size,download_dir=cache_dir)
@@ -657,6 +845,7 @@ def external_save_TESS(ra,dec,sector,size=90,quality_bitmask='default',cache_dir
 	
 	else:
 		os.system(f'mv {tpf.path} {os.getcwd()}')
+
 
 def external_get_TESS():
 
@@ -671,9 +860,7 @@ def external_get_TESS():
 				print('Too Many tpfs here!')
 	tpf = lk.TessTargetPixelFile(target)
 	return tpf
-
-
-
+	
 
 def sig_err(data,err=None,sig=5,maxiter=10):
 	if sig is None:
@@ -725,6 +912,7 @@ def Identify_masks(Obj):
 					mask1[np.where(objsub==1)[0][0]] = 1
 	return np.array(Objmasks)
 
+
 def auto_tail(lc,mask,err = None):
 	if err is not None:
 		higherr = sigma_clip(err,sigma=2).mask
@@ -758,7 +946,8 @@ def auto_tail(lc,mask,err = None):
 	summed = np.nansum(masks*1,axis=0)
 	mask = summed > 0 
 	return ~mask
-		
+
+
 def Multiple_day_breaks(lc):
 	"""
 	If the TESS data has a section of data isolated by at least a day either side,
@@ -778,7 +967,6 @@ def Multiple_day_breaks(lc):
 	breaks = np.insert(breaks,0,0)
 	breaks = np.append(breaks,len(lc[0]))
 	return breaks
-
 
 
 ### Serious source mask
@@ -857,7 +1045,6 @@ def Cat_mask(tpf,maglim=19,scale=1,strapsize=3,badpix=None,ref=None,sigma=3):
 
 
 #### CLUSTERING 
-
 def Cluster_lc(lc):
 	arr = np.array([np.gradient(lc[1]),lc[1]])
 	clust = OPTICS(min_samples=12, xi=.05, min_cluster_size=.05)
